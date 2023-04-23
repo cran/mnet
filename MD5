@@ -1,0 +1,16 @@
+ddd04bab6bb576eb2c518737547fbabb *DESCRIPTION
+1017e4be61f5c9707cb205e8387ec18b *NAMESPACE
+740a1ee1167a1a3e59229b06e42d555f *R/Process_mlVAR.R
+a6f1f6598bcb16f410e40c3555c66f6f *R/mlVAR_GC.R
+e6144c585cc3bdfbe09eacebf49ef687 *R/startup_msg.R
+7f6b535997c2108895480217d1567d8f *README.md
+558206e44deb8fc083352a154910e434 *build/vignette.rds
+364b44dafe67b8c838082045e91246e9 *data/mlVARGD_sim.RData
+d70f8f6ae9980781bbb92f91ea2b1d3d *inst/doc/Vignette_mlVAR_GC.R
+02fed196b3e4947d84301fbb0b67638b *inst/doc/Vignette_mlVAR_GC.Rmd
+63d508f228ac9aff0598cfd31ac56347 *inst/doc/Vignette_mlVAR_GC.html
+556240bcc79df509fccaf408781a6b0d *man/mlVAR_GC.Rd
+c3df94e1654d9f86047c44e091fb89ee *man/mnet-internal.Rd
+308984c7beb11a0d49ff38a388692f20 *tests/testthat.R
+43433c45bd3a5059148ee9945b08558e *tests/testthat/test-mlVAR_GC.R
+02fed196b3e4947d84301fbb0b67638b *vignettes/Vignette_mlVAR_GC.Rmd
