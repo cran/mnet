@@ -3,8 +3,9 @@
 \title{Internal mnet functions}
 
 \alias{Process_mlVAR}
-\alias{data1}
-\alias{data2}
+\alias{print.mlVAR_GC}
+\alias{ExampleData}
+\alias{dataFried}
 
 \description{Internal mgm functions.}
 
