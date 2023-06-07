@@ -1,4 +1,4 @@
-# jonashaslbeck@protonmail; May 16, 2023
+# jonashaslbeck@protonmail; June 2nd, 2023
 
 # ------------------------------------------------------------
 # -------- Function for Permutation Test ---------------------
@@ -19,6 +19,7 @@ mlVAR_GC <- function(data, # data including both groups
                      beepvar = NULL,
                      groups, # indicates which case belongs to which group
                      test = "permutation", # can also be "parametric"
+                     paired = FALSE,
                      estimator, # same as in ml
                      contemporaneous, # same as in ml
                      temporal, # same as in ml
@@ -48,7 +49,10 @@ mlVAR_GC <- function(data, # data including both groups
   # (4) Are valid tests selected?
   if(!(test %in% c("permutation", "parametric"))) stop('The available tests are "permutation" and "parametric".')
 
-  # (5) Are IDs unique across datasets?
+  # (5) No paired parametric test
+  if(test == "parametric" & paired == TRUE) stop("No parametric test available for paired samples. Use the paired permutation test instead.")
+
+
   data1 <- data[v_groups==1, ]
   data2 <- data[v_groups==2, ]
 
@@ -61,8 +65,11 @@ mlVAR_GC <- function(data, # data including both groups
   u_ids2 <- unique(ids2)
   n_subj <- length(u_ids1) + length(u_ids2)
 
+  # (6) Are IDs unique across datasets? [required for indepdendent samples]
+  if(paired == FALSE) {
   v_intersec <- intersect(u_ids1, u_ids2)
   if(length(v_intersec) > 0) stop("IDs need to be unique across two datasets.")
+  }
 
   # ------ Collect passed down arguments -----
   if(missing(estimator)) estimator <- "default"
@@ -86,6 +93,7 @@ mlVAR_GC <- function(data, # data including both groups
                "verbose" = verbose,
                "pbar" = pbar)
 
+
   # ------ Get Basic Info -----
 
   # number of variables
@@ -100,6 +108,7 @@ mlVAR_GC <- function(data, # data including both groups
   totalN <- sum(v_Ns)
 
   if(pbar) pb <- txtProgressBar(0, nP+1, style = 3) else pb <- NULL
+
 
   # ------ Loop Over Permutations -----
 
@@ -120,20 +129,52 @@ mlVAR_GC <- function(data, # data including both groups
                      .packages = c("mlVAR", "mnet"),
                      .export = c("m_data_cmb", "vars", "idvar", "estimator",
                                  "contemporaneous", "temporal", "totalN", "v_Ns",
-                                 "v_ids", "pb", "pbar", "dayvar", "beepvar"),
+                                 "v_ids", "pb", "pbar", "dayvar", "beepvar", "paired"),
                      .verbose = verbose) %dopar% {
 
 
                        # --- Make permutation ---
-                       # This is done in a way that keeps the size in each group exactly the same as in the real groups
-                       v_ids_rnd <- v_u_ids[sample(1:totalN, size=totalN, replace=FALSE)]
-                       v_ids_1 <- v_ids_rnd[1:v_Ns[1]]
-                       v_ids_2 <- v_ids_rnd[(v_Ns[1]+1):totalN]
 
-                       # Split data based on permutations
-                       data_h0_1 <- m_data_cmb[v_ids %in% v_ids_1, ]
-                       data_h0_2 <- m_data_cmb[v_ids %in% v_ids_2, ]
-                       l_data_h0 <- list(data_h0_1, data_h0_2)
+                       # For independent samples
+                       if(paired == FALSE) {
+                         # This is done in a way that keeps the size in each group exactly the same as in the real groups
+                         v_ids_rnd <- v_u_ids[sample(1:totalN, size=totalN, replace=FALSE)]
+                         v_ids_1 <- v_ids_rnd[1:v_Ns[1]]
+                         v_ids_2 <- v_ids_rnd[(v_Ns[1]+1):totalN]
+
+                         # Split data based on permutations
+                         data_h0_1 <- m_data_cmb[v_ids %in% v_ids_1, ]
+                         data_h0_2 <- m_data_cmb[v_ids %in% v_ids_2, ]
+                         l_data_h0 <- list(data_h0_1, data_h0_2)
+                       } # end if
+
+                       # For dependent samples
+                       if(paired == TRUE) {
+
+                         ids1 <- sapply(data1[, idvar], as.character)
+                         ids2 <- sapply(data2[, idvar], as.character)
+                         v_ids <- c(ids1, ids2)
+
+                         ids1_uq <- unique(ids1)
+                         ids2_uq <- unique(ids2)
+                         m_ids_uq <- cbind(ids1_uq, ids2_uq)
+                         n_uq <- nrow(m_ids_uq)
+                         m_ids_uq_perm <- matrix(NA, n_uq, 2)
+                         for(i in 1:n_uq) {
+                           draw_i <- sample(1:2, size=1)
+                           if(draw_i==1) m_ids_uq_perm[i, ] <- m_ids_uq[i, ] else  m_ids_uq_perm[i, ] <- m_ids_uq[i, 2:1]
+                         }
+                         v_ids_1 <- m_ids_uq_perm[, 1]
+                         v_ids_2 <- m_ids_uq_perm[, 2]
+
+                         # Split data based on permutations
+                         data_h0_1 <- m_data_cmb[v_ids %in% v_ids_1, ]
+                         data_h0_2 <- m_data_cmb[v_ids %in% v_ids_2, ]
+                         l_data_h0 <- list(data_h0_1, data_h0_2)
+                       } # end if
+
+                       # browser()
+
 
 
                        # --- Fit mlVAR models ---
@@ -175,7 +216,8 @@ mlVAR_GC <- function(data, # data including both groups
 
                        # All differences are: Group 1 - Group 2
                        diffs_b <- Process_mlVAR(object1 = l_pair_b[[1]],
-                                                object2 = l_pair_b[[2]])
+                                                object2 = l_pair_b[[2]],
+                                                empirical = FALSE)
 
                        outlist_b <- list("diff_between" = diffs_b$diff_between,
                                          "diff_phi_fix" = diffs_b$diff_phi_fix,
@@ -290,9 +332,10 @@ mlVAR_GC <- function(data, # data including both groups
 
     # c.2) Contemp: RE sds
     m_pval_gam_RE_sd <- matrix(NA, p, p)
-    for(i in 2:p) for(j in 1:(i-1)) m_pval_gam_RE_sd[i,j] <- mean(abs(a_gam_RE_sd[i,j,])>abs(diffs_true$diff_gam_RE_sd[i,j]))
+    for(i in 2:p) for(j in 1:(i-1)) m_pval_gam_RE_sd[i,j] <- mean(abs(a_gam_RE_sd[i,j,])>abs(diffs_true$diff_gam_RE_sd[i,j]), na.rm=TRUE)
+    # Especially in conditions with low SNR, Random effects cannot be estimated and mlVAR/lme4 returns errors
 
-    # a) between
+    # a) Between
     m_pval_btw <- matrix(NA, p, p)
     for(i in 2:p) for(j in 1:(i-1)) m_pval_btw[i,j] <- mean(abs(a_between[i,j,])>abs(diffs_true$diff_between[i,j]), na.rm=TRUE)
     # Note: the na.rm=TRUE in the means is there so we can exclude the rare cases in which between-networks
@@ -303,23 +346,24 @@ mlVAR_GC <- function(data, # data including both groups
     outlist <- list("Call" = Call,
                     "EmpDiffs" = list("Lagged_fixed" = diffs_true$diff_phi_fix,
                                       "Lagged_random" = diffs_true$diff_phi_RE_sd,
-                                      "Comtemp_fixed" = diffs_true$diff_gam_fix,
-                                      "Comtemp_random" = diffs_true$diff_gam_RE_sd,
+                                      "Contemp_fixed" = diffs_true$diff_gam_fix,
+                                      "Contemp_random" = diffs_true$diff_gam_RE_sd,
                                       "Between" = diffs_true$diff_between),
                     "Pval" = list("Lagged_fixed" = m_pval_phi_fix,
                                   "Lagged_random" = m_pval_phi_RE_sd,
-                                  "Comtemp_fixed" = m_pval_gam_fixed,
-                                  "Comtemp_random" = m_pval_gam_RE_sd,
+                                  "Contemp_fixed" = m_pval_gam_fixed,
+                                  "Contemp_random" = m_pval_gam_RE_sd,
                                   "Between" = m_pval_btw),
                     "SampDist" = list("Lagged_fixed" = a_phi_fixed,
                                       "Lagged_random" = a_phi_RE_sd,
-                                      "Comtemp_fixed" = a_gam_fixed,
-                                      "Comtemp_random" = a_gam_RE_sd,
+                                      "Contemp_fixed" = a_gam_fixed,
+                                      "Contemp_random" = a_gam_RE_sd,
                                       "Between" = a_between),
                     "Models" = l_out_ret,
                     "Runtime_min" = runtime / 60)
 
   } # end if: permutation
+
 
 
   # ------ Compute p-values based on standard errors [parametric test] -----
@@ -331,7 +375,7 @@ mlVAR_GC <- function(data, # data including both groups
     bet_2 <- l_out_emp[[2]]$results$Beta$mean[, , 1]
     bet_2se <- l_out_emp[[2]]$results$Beta$SE[, , 1]
     t_stat <- abs(bet_1-bet_2)/ sqrt(bet_1se^2 + bet_2se^2)
-    m_pval_phi_fix <- pt(t_stat, n_subj-1, lower.tail = FALSE)
+    m_pval_phi_fix <- pt(t_stat, df=n_subj-2, lower.tail = FALSE) * 2 # times two to make 2-sided
 
     # --- Contemporaneous effects ---
     # Average across nodewise reg to get estimates and SEs
@@ -340,7 +384,7 @@ mlVAR_GC <- function(data, # data including both groups
     bet_2 <-  (l_out_emp[[2]]$results$Gamma_Theta$mean + t(l_out_emp[[2]]$results$Gamma_Theta$mean)) / 2
     bet_2se <- (l_out_emp[[2]]$results$Gamma_Theta$SE + t(l_out_emp[[2]]$results$Gamma_Theta$SE)) / 2
     t_stat <- abs(bet_1-bet_2)/ sqrt(bet_1se^2 + bet_2se^2)
-    m_pval_gam_fixed <- pt(t_stat, n_subj-1, lower.tail = FALSE)
+    m_pval_gam_fixed <- pt(t_stat, df=n_subj-2, lower.tail = FALSE) * 2 # times two to make 2-sided
     m_pval_gam_fixed[upper.tri(m_pval_gam_fixed)] <- NA
     diag(m_pval_gam_fixed) <- NA
 
@@ -351,7 +395,7 @@ mlVAR_GC <- function(data, # data including both groups
     bet_2 <- (l_out_emp[[2]]$results$Gamma_Omega_mu$mean + t(l_out_emp[[2]]$results$Gamma_Omega_mu$mean)) / 2
     bet_2se <- (l_out_emp[[2]]$results$Gamma_Omega_mu$SE + t(l_out_emp[[2]]$results$Gamma_Omega_mu$SE)) / 2
     t_stat <- abs(bet_1-bet_2)/ sqrt(bet_1se^2 + bet_2se^2)
-    m_betw_sign <- pt(t_stat, n_subj-1, lower.tail = FALSE)
+    m_betw_sign <- pt(t_stat, df=n_subj-2, lower.tail = FALSE) * 2 # times two to make 2-sided
     m_betw_sign[upper.tri(m_pval_gam_fixed)] <- NA
     diag(m_betw_sign) <- NA
 
@@ -361,16 +405,15 @@ mlVAR_GC <- function(data, # data including both groups
     outlist <- list("Call" = Call,
                     "EmpDiffs" = list("Lagged_fixed" = diffs_true$diff_phi_fix,
                                       "Lagged_random" = diffs_true$diff_phi_RE_sd,
-                                      "Comtemp_fixed" = diffs_true$diff_gam_fix,
-                                      "Comtemp_random" = diffs_true$diff_gam_RE_sd,
+                                      "Contemp_fixed" = diffs_true$diff_gam_fix,
+                                      "Contemp_random" = diffs_true$diff_gam_RE_sd,
                                       "Between" = diffs_true$diff_between),
                     "Pval" = list("Lagged_fixed" = m_pval_phi_fix,
-                                  "Comtemp_fixed" = m_pval_gam_fixed,
+                                  "Contemp_fixed" = m_pval_gam_fixed,
                                   "Between" = m_betw_sign),
                     "Runtime_min" = runtime / 60)
 
   } # end if: test=parametric
-
 
 
   # ------ Return Output -----
