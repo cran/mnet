@@ -11,8 +11,10 @@ Does inference on group differences in mlVAR models using a permutation test. Th
 \usage{
 mlVAR_GC(data, vars, idvar, dayvar = NULL,
          beepvar = NULL, groups, test = "permutation",
-         paired = FALSE, estimator, contemporaneous,
-         temporal, nCores = 1, nP = 500, saveModels = FALSE,
+         partest = "Welch", paired = FALSE,
+         estimator, contemporaneous, temporal,
+         scale, nCores = 1, nP = 500,
+         saveModels = FALSE, saveEmpModels = FALSE,
          verbose = FALSE, pbar = TRUE)
 }
 
@@ -36,7 +38,10 @@ Optional: The name of the column indicating measurement occasion per day. Adding
 The name of the column indicating group membership.
 }
   \item{test}{
-The type of test used. Defaults to \code{test = "permutation"}, which performs a permutation test. Alternatively, \code{test = "parametric"} performs a parametric test based on confidence intervals. For the latter, a (vectorcritical p-value has to be specified.
+The type of test used. Defaults to \code{test = "permutation"}, which performs a permutation test. Alternatively, \code{test = "parametric"} performs a parametric test based on confidence intervals.
+}
+  \item{partest}{
+The type of parametric test used if \code{test = "parametric"} is selected. Defaults to \code{partest = "Welch"} for Welch's t-test, which does not assume equal population variances. The alternative is \code{partest = "Student"} for Student's t-test.
 }
   \item{paired}{
 Indicates whether samples are paired or not (independent). If \code{paired = TRUE} indicates dependent samples. This requires that \code{idvar} needs to be specified such that each subject is contained in both groups, which implies that both groups have the same size. Also, the function assumes that the subjects are ordered in the same way in both groups. In this case, the permutation is computed based on within-person permutationst. The parametric test is not possible in this case since we are not able to obtain the required standard error from \code{mlVAR} models. If \code{paired = FALSE} the permutations are unrestricted. Defaults to \code{paired = FALSE}.
@@ -51,6 +56,9 @@ How should the contemporaneous networks be estimated? These networks are always 
   \item{temporal}{
 How should the temporal effects be estimated? \code{"correlated"} estimates correlated random effects, \code{"orthogonal"} estimates non-correlated random effects and \code{"fixed"} estimates a model in which only the intercept is random. Defaults to \code{"correlated"} when the number of variables is less than 6 and \code{"orthogonal"} otherwise. \code{"unique"} uses lm to estimate an unique model for each subject. See also \code{mlVAR()}.
 }
+  \item{scale}{
+Argument passed to \code{mlVAR}. If \code{scale = TRUE}, each variable is standardized before estimation.
+}
   \item{nCores}{
 Number of cores to use in computation. See also \code{mlVAR()}.
 }
@@ -59,6 +67,9 @@ Number of permutations used to create the sampling distribution under the null h
 }
   \item{saveModels}{
 If true, the pair of mlVAR objects for each permutations are saved in the output. Defaults to \code{saveModels = FALSE} since the resulting output object can become very large.
+}
+  \item{saveEmpModels}{
+If true, the pair of mlVAR objects estimated on the two groups in the empirical data are returned in a list of two. The first entry contains the mlVAR model object for the first group. Defaults to \code{saveEmpModels = FALSE} to save space.
 }
   \item{verbose}{
 If true, the the verbose option in foreach, which is used in side \code{mlVAR_GC()}, is switched on. Defaults to \code{verbose = FALSE}.
@@ -103,7 +114,7 @@ out <- mlVAR_GC(data = ExampleData,
                 idvar = "id",
                 groups = "group",
                 nCores = 2, # choose max cores possible on your machine
-                nP = 2) # Should be more in practice, see paper!
+                nP = 2) # Should be much more in practice, see paper!
 
 # P-values for the five parameter types:
 out$Pval

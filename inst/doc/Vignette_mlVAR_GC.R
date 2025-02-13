@@ -1,4 +1,4 @@
-## ---- include = FALSE---------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = ">"
@@ -37,7 +37,7 @@ output$EmpDiffs
 ## -----------------------------------------------------------------------------
 output$Pval
 
-## ---- fig.align="center", fig.width=7, fig.height=5---------------------------
+## ----fig.align="center", fig.width=7, fig.height=5----------------------------
 hist(output$SampDist$Lagged_fixed[1,2,], 
      xlim=c(-.5, .5), main="", xlab="Parameter Value")
 abline(v=output$EmpDiffs$Lagged_fixed[1,2,], col="orange")
